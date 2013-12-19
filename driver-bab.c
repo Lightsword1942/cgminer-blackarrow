@@ -50,7 +50,7 @@ static void bab_detect(__maybe_unused bool hotplug)
 #define BAB_GPIO_CLR BAB_ADDR(10)
 #define BAB_GPIO_LEVEL BAB_ADDR(13)
 
-#define BAB_MAXCHIPS 256
+#define BAB_MAXCHIPS 384
 #define BAB_MAXBUF (BAB_MAXCHIPS * 512)
 #define BAB_MAXBANKS 4
 #define BAB_CORES 16
@@ -122,7 +122,7 @@ static const uint32_t bab_test_data[BAB_TEST_DATA] = {
 };
 
 //maximum number of chips on alternative bank
-// #define BANKCHIPS 64
+#define BAB_BANKCHIPS 96
 
 /*
  * maximum chip speed available for auto tuner
@@ -1166,7 +1166,24 @@ bad_out:
 
 static void bab_init_chips(struct cgpu_info *babcgpu, struct bab_info *babinfo)
 {
-	bab_detect_chips(babcgpu, babinfo, 0, 0, BAB_MAXCHIPS);
+    // TODO: How do we detect the version at runtime?
+
+    // Version 1:
+    // bab_detect_chips(babcgpu, babinfo, 0, 0, BAB_MAXCHIPS);
+
+    // Version 2:
+    int chips = 0, bank, chip;
+    for (bank = 1; bank <= BAB_MAXBANKS; bank++) {
+        for (chip = 0; chip < BAB_MAXCHIPS && chip < chips + BAB_BANKCHIPS; chip++) {
+            babinfo->chip_spis[chip] = 625000;
+        }
+        bab_reset(bank, 64);
+        bab_detect_chips(babcgpu, babinfo, bank, chips, chips + BAB_BANKCHIPS);
+        printf("bank %i, chips = %i\n", bank, babinfo->chips);
+        chips = babinfo->chips;
+    }
+    bab_reset(0, 8);
+
 	memcpy(babinfo->old_conf, babinfo->chip_conf, sizeof(babinfo->old_conf));
 	memcpy(babinfo->old_fast, babinfo->chip_fast, sizeof(babinfo->old_fast));
 }
